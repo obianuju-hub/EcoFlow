@@ -1,4 +1,11 @@
 import { OpenAI } from "openai";
+import { PrismaClient } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../lib/auth";
+import { writeFile } from "fs/promises";
+import { join } from "path";
+
+const prisma = new PrismaClient();
 
 export async function POST(req) {
   try {
@@ -58,19 +65,15 @@ export async function POST(req) {
               },
               {
                 type: "text",
-                text: "2. `reasoning`: Explain why the product received this rating, listing specific ingredients or materials.",
+                text: "2. `reasoning`: A detailed explanation (2-3 sentences) of why the product received this rating, listing specific ingredients or materials.",
               },
               {
                 type: "text",
-                text: "3. `recommendation`: If the rating is 5 or lower, suggest specific alternative products with **brand names and model names** that are better for the environment.",
+                text: "3. `recommendations`: An array of exactly 3 eco-friendly alternative products. Each item should be a string with brand name and product name. Always provide 3 alternatives regardless of the rating.",
               },
               {
                 type: "text",
-                text: "Ensure the response is **valid JSON format** with keys: `rating`, `reasoning`, and `recommendation`.",
-              },
-              {
-                type: "text",
-                text: "For `recommendation`, provide at least 3 alternative eco-friendly products with brand names and model names.",
+                text: "Example JSON format: {\"rating\": 4, \"reasoning\": \"This product contains harmful chemicals...\", \"recommendations\": [\"Seventh Generation Free & Clear Laundry Detergent - Plant-based and biodegradable\", \"Ecover Zero Sensitive Laundry Liquid - Hypoallergenic with renewable ingredients\", \"Method Laundry Detergent - 8x concentrated formula in recyclable packaging\"]}",
               },
               ...base64Files.map((file) => ({
                 type: "image_url",
@@ -100,13 +103,60 @@ export async function POST(req) {
       try {
         // Parse content into JSON if it's a valid JSON string
         const parsedContent = JSON.parse(content);
-        
+
+        // Get user session
+        const session = await getServerSession(authOptions);
+
+        // Save to database if user is logged in
+        if (session && session.user && session.user.email) {
+          try {
+            // Save the first image to the file system
+            let imageUrl = "";
+            if (files[0]) {
+              const file = files[0];
+              const bytes = await file.arrayBuffer();
+              const buffer = Buffer.from(bytes);
+
+              // Generate unique filename
+              const timestamp = Date.now();
+              const filename = `${timestamp}-${file.name}`;
+              const filepath = join(process.cwd(), "public", "uploads", filename);
+
+              // Save file to public/uploads
+              await writeFile(filepath, buffer);
+
+              // Store relative path for database
+              imageUrl = `/uploads/${filename}`;
+            }
+
+            // Ensure rating is a valid integer
+            const rating = parseInt(parsedContent.rating);
+            if (isNaN(rating)) {
+              console.error("Invalid rating value:", parsedContent.rating);
+            }
+
+            await prisma.analysis.create({
+              data: {
+                userEmail: session.user.email,
+                imageUrl: imageUrl || "",
+                rating: !isNaN(rating) ? rating : 0,
+                reasoning: String(parsedContent.reasoning || ""),
+                recommendation: JSON.stringify(parsedContent.recommendations || parsedContent.recommendation || []),
+              },
+            });
+          } catch (dbError) {
+            console.error("Database save error:", dbError);
+            // Don't throw - continue to return the analysis even if save fails
+          }
+        }
+
         // Return the parsed JSON response
         return new Response(JSON.stringify(parsedContent), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
-      } catch (err) {
+      } catch (parseErr) {
+        console.error("JSON parse error:", parseErr);
         throw new Error("Failed to parse OpenAI response as JSON.");
       }
     } else {

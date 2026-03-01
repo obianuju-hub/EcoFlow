@@ -1,0 +1,20 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Analysis {
+  id              String   @id @default(uuid())
+  userEmail       String
+  imageUrl        String
+  rating          Int
+  reasoning       String
+  recommendation  String
+  createdAt       DateTime @default(now())
+}

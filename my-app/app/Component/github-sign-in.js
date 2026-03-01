@@ -1,14 +1,18 @@
+"use client";
+
 import React from 'react'
-import { signIn } from '../lib/auth'
+import { signIn } from 'next-auth/react'
 
 const GithubSignIn = () => {
+  const handleGithubSignIn = async () => {
+    await signIn("github");
+  };
+
   return (
-    <form
-    action={async()=>{
-        "use server"
-        await signIn("github")
-    }}
-    >
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      handleGithubSignIn();
+    }}>
 
 
         <button className=' border-4 '>git hub 

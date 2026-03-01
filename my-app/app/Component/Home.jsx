@@ -172,16 +172,21 @@ const Home = ({ session }) => {
               <p className="text-gray-700">{analysis.reasoning}</p>
             </div>
 
-            {analysis.recommendation && Array.isArray(analysis.recommendation) && (
+            {(analysis.recommendations || analysis.recommendation) && (
   <div>
-    <h3 className="font-semibold text-lg mb-3">Eco-friendly Alternatives</h3>
+    <h3 className="font-semibold text-lg mb-3">Eco-Friendly Alternatives</h3>
     <div className="space-y-3">
-      {analysis.recommendation.map((item, index) => (
-        <div key={index} className="p-4 bg-[#f0fdf4] rounded-lg">
-          <p className="font-semibold text-[#16a34a]">{item.brand}</p>
-          <p className="text-gray-600">{item.product}</p>
+      {Array.isArray(analysis.recommendations || analysis.recommendation) ? (
+        (analysis.recommendations || analysis.recommendation).map((item, index) => (
+          <div key={index} className="p-4 bg-[#f0fdf4] rounded-lg border-l-4 border-[#16a34a]">
+            <p className="text-gray-700">{typeof item === 'string' ? item : item.brand || item.product || item}</p>
+          </div>
+        ))
+      ) : (
+        <div className="p-4 bg-[#f0fdf4] rounded-lg border-l-4 border-[#16a34a]">
+          <p className="text-gray-700 whitespace-pre-wrap">{analysis.recommendations || analysis.recommendation}</p>
         </div>
-      ))}
+      )}
     </div>
   </div>
 )}
